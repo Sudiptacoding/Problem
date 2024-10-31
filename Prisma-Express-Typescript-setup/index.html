@@ -62,7 +62,7 @@ npx prisma init
 
 
 
-DATABASE_URL="file:./dev.db"
+DATABASE_URL="mysql://username:password@localhost:3306/mydatabase"
 
 
 
@@ -76,6 +76,26 @@ model User {
   name  String
   email String  @unique
 }
+
+
+-------OR -------
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id    Int     @id @default(autoincrement())
+  name  String
+  email String  @unique
+}
+
+
 
 
 
