@@ -1,0 +1,175 @@
+Prisma, TypeScript, এবং Express যুক্ত করে একটি প্রোজেক্ট সেটআপ করতে নিম্নোক্ত ধাপগুলো অনুসরণ করুন:
+
+১. প্রোজেক্ট ইনিশিয়ালাইজ এবং ডিপেন্ডেন্সি ইন্সটল করুন
+প্রথমে আপনার প্রোজেক্টের জন্য একটি নতুন ডিরেক্টরি তৈরি করুন এবং Node.js প্রোজেক্ট ইনিশিয়ালাইজ করুন। এরপর Express, TypeScript এবং Prisma ইন্সটল করুন।
+
+------- optional-------
+
+mkdir my-prisma-app
+cd my-prisma-app
+
+
+
+
+
+
+npm init -y
+npm install express
+npm install typescript ts-node @types/node @types/express --save-dev
+npm install @prisma/client
+npm install prisma --save-dev
+
+
+
+
+
+২. TypeScript ইনিশিয়ালাইজ করুন
+TypeScript কনফিগারেশন ফাইল tsconfig.json তৈরি করুন:
+
+
+npx tsc --init
+
+
+
+এরপর tsconfig.json ফাইলে কিছু সেটিংস করুন:
+
+
+{
+  "compilerOptions": {
+    "target": "es6",
+    "module": "commonjs",
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "strict": true,
+    "esModuleInterop": true
+  }
+}
+
+
+
+
+
+৩. Prisma সেটআপ করুন
+Prisma স্কিমা তৈরি করতে prisma init কমান্ডটি ব্যবহার করুন, যা prisma নামের ফোল্ডার এবং schema.prisma নামের ফাইল তৈরি করবে।
+
+
+npx prisma init
+
+
+
+এই কমান্ডটি চালালে prisma/schema.prisma এবং .env ফাইল তৈরি হবে। .env ফাইলে ডাটাবেসের URL সংযোজন করতে হবে। উদাহরণস্বরূপ, SQLite ব্যবহার করলে .env ফাইলে নিচের মতো সেট করতে পারেন:
+
+
+
+
+DATABASE_URL="file:./dev.db"
+
+
+
+
+৪. Prisma স্কিমা তৈরি করুন
+prisma/schema.prisma ফাইলটি খুলে নিচের মতো একটি মডেল যুক্ত করুন, যেমন একটি User মডেল:
+
+
+model User {
+  id    Int     @id @default(autoincrement())
+  name  String
+  email String  @unique
+}
+
+
+
+এরপর ডাটাবেস মাইগ্রেশন তৈরি করতে নিচের কমান্ডটি চালান:
+
+
+npx prisma migrate dev --name init
+
+
+এই কমান্ডটি আপনার মডেলের জন্য প্রাথমিক মাইগ্রেশন তৈরি করবে এবং ডাটাবেসে তা প্রয়োগ করবে।
+
+
+
+
+
+
+৫. ফোল্ডার স্ট্রাকচার তৈরি করুন
+প্রোজেক্টের মূল ডিরেক্টরির ভিতরে একটি src ফোল্ডার তৈরি করুন, এবং src/index.ts নামে এন্ট্রি পয়েন্ট ফাইল তৈরি করুন।
+
+mkdir src
+touch src/index.ts
+
+-----or------
+
+src/index.ts
+
+
+
+৬. Prisma ক্লায়েন্ট ইনস্ট্যান্স তৈরি করুন
+src/index.ts ফাইলে Prisma ক্লায়েন্ট ব্যবহার করে Express অ্যাপ তৈরি করুন।
+
+
+
+import express, { Request, Response } from 'express';
+import { PrismaClient } from '@prisma/client';
+
+const app = express();
+const prisma = new PrismaClient();
+const PORT = 3000;
+
+app.use(express.json());
+
+app.get('/', (req: Request, res: Response) => {
+  res.send('Hello, Prisma with TypeScript and Express!');
+});
+
+
+
+// একটি নতুন ইউজার তৈরি করার রুট
+app.post('/user', async (req: Request, res: Response) => {
+  const { name, email } = req.body;
+  try {
+    const newUser = await prisma.user.create({
+      data: { name, email },
+    });
+    res.json(newUser);
+  } catch (error) {
+    res.status(500).json({ error: 'User creation failed' });
+  }
+});
+
+app.listen(PORT, () => {
+  console.log(`Server is running on http://localhost:${PORT}`);
+});
+
+
+
+
+
+
+৭. package.json এ স্ক্রিপ্ট যুক্ত করুন
+package.json এ স্ক্রিপ্টস যোগ করুন, যাতে আপনি TypeScript ফাইলগুলো কম্পাইল এবং সরাসরি TypeScript ফাইল রান করতে পারেন।
+
+
+
+"scripts": {
+  "build": "tsc",
+  "start": "node dist/index.js",
+  "dev": "ts-node src/index.ts",
+  "prisma": "prisma"
+}
+
+
+
+
+৮. অ্যাপ রান করুন
+ডেভেলপমেন্ট মোডে অ্যাপ রান করতে নিচের কমান্ড ব্যবহার করুন:
+
+
+npm run dev
+
+
+
+৯. Prisma ক্লায়েন্ট ব্যবহার করে কোয়েরি চালানো
+আপনার প্রোজেক্টে এখন Prisma ক্লায়েন্ট ব্যবহার করে ডাটাবেসের সাথে ইন্টারঅ্যাক্ট করতে পারবেন। যেমন, /user রুটে POST রিকোয়েস্ট পাঠিয়ে নতুন ইউজার তৈরি করতে পারবেন।
+
+এখন আপনার প্রোজেক্টে Prisma, TypeScript, এবং Express যুক্ত করা হয়েছে। TypeScript আপনাকে উন্নত ডেভেলপমেন্ট এক্সপেরিয়েন্স দেবে, আর Prisma ডাটাবেস ম্যানেজমেন্টকে সহজ করবে।
