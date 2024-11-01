@@ -105,6 +105,8 @@ email String @unique
 
 -------OR -------
 
+<!-- npx prisma migrate dev --name add_user_fields -->
+
 datasource db {
 provider = "mysql"
 url = env("DATABASE_URL")
@@ -114,10 +116,21 @@ generator client {
 provider = "prisma-client-js"
 }
 
+
 model User {
-id Int @id @default(autoincrement())
-name String
-email String @unique
+id Int @id @default(autoincrement()) // Primary key, auto-incremented integer
+name String // সাধারণ স্ট্রিং
+email String @unique // ইউনিক স্ট্রিং যা প্রতিটি ইউজারের জন্য ভিন্ন
+age Int? // অপশনাল পূর্ণসংখ্যা (nullable)
+isActive Boolean @default(true) // বুলিয়ান টাইপ, যা ডিফল্টভাবে true
+createdAt DateTime @default(now()) // সময়ের তথ্য সংরক্ষণ, ডিফল্টভাবে বর্তমান সময়
+updatedAt DateTime @updatedAt // স্বয়ংক্রিয়ভাবে আপডেটের সময় রেকর্ড করে
+profile Bytes? // বাইট টাইপ, সাধারণত বড় ফাইল বা বাইনারি ডেটা সংরক্ষণের জন্য
+height Float? // অপশনাল দশমিক সংখ্যা
+role String @default("USER") // রোল ফিল্ড যা ডিফল্টভাবে 'USER'
+address Json? // JSON টাইপ ডেটা, কাঠামোবদ্ধ ডেটা সংরক্ষণ করতে
+birthDate DateTime? // জন্মতারিখ সংরক্ষণের জন্য
+posts Post[] // রিলেশনাল টাইপ, যেখানে User মডেল থেকে Post মডেলে সম্পর্ক সংরক্ষণ করা হয়
 }
 
 
@@ -269,7 +282,7 @@ project-root/
 Example
 ----------------
 
-1.   utils/db.ts: Prisma Client ইনস্ট্যান্স তৈরি এবং এটি পুরো প্রজেক্টে ব্যবহারযোগ্য রাখতে এই ফাইল ব্যবহার হয়।
+1. utils/db.ts: Prisma Client ইনস্ট্যান্স তৈরি এবং এটি পুরো প্রজেক্টে ব্যবহারযোগ্য রাখতে এই ফাইল ব্যবহার হয়।
 
 import { PrismaClient } from '@prisma/client';
 const prisma = new PrismaClient();
@@ -278,7 +291,7 @@ export default prisma;
 
 
 
-2.   index.ts: এক্সপ্রেস অ্যাপ্লিকেশন চালু করার মূল ফাইল।
+2. index.ts: এক্সপ্রেস অ্যাপ্লিকেশন চালু করার মূল ফাইল।
 
 import express from 'express';
 import app from './app';
@@ -286,7 +299,7 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Server is running on port ${PORT}`));
 
 
-3.   app.ts: Express অ্যাপ্লিকেশনটি সেটআপ করে এবং সমস্ত রাউট এবং মিডলওয়্যার সংযুক্ত করে।
+3. app.ts: Express অ্যাপ্লিকেশনটি সেটআপ করে এবং সমস্ত রাউট এবং মিডলওয়্যার সংযুক্ত করে।
 
 
 import express from 'express';
@@ -298,23 +311,23 @@ const app = express();
 app.use(express.json());
 
 // Routes
-app.use('/users', userRoutes);
-app.use('/posts', postRoutes);
-app.use('/comments', commentRoutes);
+app.use('/api', userRoutes);
+app.use('/api', postRoutes);
+app.use('/api', commentRoutes);
 
 export default app;
 
 
 
-4.   userRoutes.ts ফাইলে (উদাহরণ রাউট এবং কন্ট্রোলার)
+4. userRoutes.ts ফাইলে (উদাহরণ রাউট এবং কন্ট্রোলার)
 
 
 import express from 'express';
 import { getUsers, createUser } from '../controllers/userController';
 const router = express.Router();
 
-router.get('/', getUsers);
-router.post('/', createUser);
+router.get('/user', getUsers);
+router.post('/user', createUser);
 
 export default router;
 
@@ -322,7 +335,7 @@ export default router;
 
 
 
-5.   userController.ts ফাইলে:
+5. userController.ts ফাইলে:
 
 
 import { Request, Response } from 'express';
@@ -342,3 +355,83 @@ res.json(user);
 
 
 এই স্ট্রাকচারটি আপনাকে আপনার প্রজেক্টকে আরও সহজে এবং সুশৃঙ্খলভাবে পরিচালনা করতে সহায়তা করবে।
+
+
+
+<!-- Relation in database -->
+
+1. One-to-One (এক-এক সম্পর্ক)
+একটি টেবিলের একটি রেকর্ড আরেকটি টেবিলের কেবলমাত্র একটি রেকর্ডের সাথে সম্পর্কিত হলে এটি one-to-one সম্পর্ক। উদাহরণস্বরূপ,
+একটি User টেবিলে প্রতিটি ইউজারের জন্য একটি Profile থাকতে পারে।
+
+
+model User {
+id Int @id @default(autoincrement())
+name String
+email String @unique
+profile Profile?
+}
+
+model Profile {
+id Int @id @default(autoincrement())
+bio String
+userId Int @unique
+user User @relation(fields: [userId], references: [id])
+}
+
+এখানে User মডেলে একটি ইউজারের জন্য একটি Profile রয়েছে এবং Profile মডেলে userId নামে একটি ফরেন কি ব্যবহার করা হয়েছে, যা
+User মডেলের id এর সাথে সম্পর্কিত।
+
+যখন এই মডেল সংযোজন করবেন, তখন স্কিমা পরিবর্তনের পর migrate কমান্ড চালাতে হবে:
+
+npx prisma migrate dev --name add_one_to_one_relationship
+
+
+2. One-to-Many (এক-একাধিক সম্পর্ক)
+একটি টেবিলের একটি রেকর্ড আরেকটি টেবিলের একাধিক রেকর্ডের সাথে সম্পর্কিত হলে এটি one-to-many সম্পর্ক। যেমন, একটি User
+অনেকগুলো Post করতে পারে।
+
+model User {
+id Int @id @default(autoincrement())
+name String
+posts Post[]
+}
+
+model Post {
+id Int @id @default(autoincrement())
+title String
+content String
+userId Int
+user User @relation(fields: [userId], references: [id])
+}
+
+
+এখানে User মডেলে অনেকগুলো Post সম্পর্কিত রয়েছে, যেখানে Post মডেলে userId ফরেন কি হিসেবে User এর id এর সাথে সম্পর্কিত।
+
+স্কিমা আপডেট করে নিম্নোক্ত কমান্ড চালাতে হবে:
+
+
+npx prisma migrate dev --name add_one_to_many_relationship
+
+3. Many-to-Many (একাধিক-একাধিক সম্পর্ক)
+একটি টেবিলের একাধিক রেকর্ড অন্য একটি টেবিলের একাধিক রেকর্ডের সাথে সম্পর্কিত হলে এটি many-to-many সম্পর্ক। যেমন, Student
+এবং Course মডেলের ক্ষেত্রে একজন শিক্ষার্থী একাধিক কোর্স করতে পারে, এবং প্রতিটি কোর্সে একাধিক শিক্ষার্থী থাকতে পারে।
+
+model Student {
+id Int @id @default(autoincrement())
+name String
+courses Course[] @relation("StudentCourses")
+}
+
+model Course {
+id Int @id @default(autoincrement())
+title String
+students Student[] @relation("StudentCourses")
+}
+
+এখানে Student এবং Course এর মধ্যে many-to-many সম্পর্ক স্থাপন করা হয়েছে। Prisma এই সম্পর্কের জন্য একটি junction table
+(যেমন, StudentCourses) তৈরি করে।
+
+স্কিমা আপডেট করে নিম্নোক্ত কমান্ড চালাতে হবে:
+
+npx prisma migrate dev --name add_many_to_many_relationship
