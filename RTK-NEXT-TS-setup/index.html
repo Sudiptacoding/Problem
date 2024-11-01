@@ -1,0 +1,228 @@
+****. প্রজেক্ট ফোল্ডার স্ট্রাকচার
+
+my-app/
+├── src/ # সমস্ত সোর্স কোড এখানে থাকবে
+│ ├── app/ # Next.js 13+ App Router
+│ │ ├── api/ # API রাউট
+│ │ ├── layout.tsx # অ্যাপের রুট লেআউট
+│ ├── components/ # পুনঃব্যবহারযোগ্য কম্পোনেন্ট
+│ ├── context/ # গ্লোবাল কন্টেক্সট প্রোভাইডার
+│ ├── hooks/ # কাস্টম হুক্স
+│ ├── redux/ # Redux এবং RTK Query সেটআপ
+│ │ ├── api/ # RTK Query API ডেফিনেশন
+│ │ └── slices/ # Redux স্লাইস
+│ ├── types/ # TypeScript টাইপস
+│ └── utils/ # ইউটিলিটি ফাংশন
+├── .env # এনভায়রনমেন্ট ভ্যারিয়েবল
+└── next.config.js # Next.js কনফিগারেশন
+
+
+
+১. প্রজেক্ট সেটআপ
+
+প্রথমে আপনার Next.js ও TypeScript প্রজেক্ট সেটআপ করুন এবং প্রয়োজনীয় প্যাকেজ ইন্সটল করুন।
+
+npx create-next-app@latest my-app --ts
+cd my-app
+npm install @reduxjs/toolkit react-redux
+
+
+
+২. Redux এবং RTK Query কনফিগারেশন
+RTK Query ব্যবহার করতে Redux স্টোর কনফিগার করতে হবে।
+
+redux/store.ts
+
+src/redux/store.ts ---Folder structer
+
+
+import { configureStore } from '@reduxjs/toolkit';
+import { apiSlice } from './api/apiSlice';
+
+const store = configureStore({
+reducer: {
+[apiSlice.reducerPath]: apiSlice.reducer,
+},
+middleware: (getDefaultMiddleware) =>
+getDefaultMiddleware().concat(apiSlice.middleware),
+});
+
+export type RootState = ReturnType<typeof store.getState>;
+    export type AppDispatch = typeof store.dispatch;
+    export default store;
+
+
+
+
+    ৩. RTK Query API Slice তৈরি করা
+    RTK Query এর মাধ্যমে আপনার REST API রিকোয়েস্টগুলি হ্যান্ডেল করতে apiSlice তৈরি করুন।
+
+    redux/api/apiSlice.ts
+
+    // src/redux/api/apiSlice.ts
+
+
+
+    import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
+
+    export const apiSlice = createApi({
+    reducerPath: 'api',
+    baseQuery: fetchBaseQuery({ baseUrl: 'http://localhost:3000/api' }),
+    endpoints: (builder) => ({
+    getPosts: builder.query({
+    query: () => '/post',
+    }),
+    getUser: builder.query({
+    query: (id: string) => `/user/${id}`,
+    }),
+    addUser: builder.mutation({
+    query: (user) => ({
+    url: '/user',
+    method: 'POST',
+    body: user,
+    }),
+    }),
+    updateUser: builder.mutation({
+    query: ({ id, ...user }) => ({
+    url: `/user/${id}`,
+    method: 'PUT',
+    body: user,
+    }),
+    }),
+    deleteUser: builder.mutation({
+    query: (id) => ({
+    url: `/user/${id}`,
+    method: 'DELETE',
+    }),
+    }),
+    }),
+    });
+
+    export const {
+    useGetPostsQuery,
+    useGetUserQuery,
+    useAddUserMutation,
+    useUpdateUserMutation,
+    useDeleteUserMutation,
+    } = apiSlice;
+
+
+
+    ৪. Redux Provider সেটআপ করা
+    আপনার Next.js অ্যাপে Redux প্রোভাইডার সেটআপ করুন, যাতে Redux স্টোর অ্যাপ জুড়ে অ্যাক্সেস করা যায়।
+
+    app/layout.tsx
+
+
+
+    // src/app/layout.tsx
+
+
+
+    import { Provider } from 'react-redux';
+    import store from '../redux/store';
+
+    export default function RootLayout({
+    children,
+    }: {
+    children: React.ReactNode;
+    }) {
+    return (
+    <Provider store={store}>
+        {children}
+    </Provider>
+    );
+    }
+
+
+
+    ৫. কম্পোনেন্টে API ব্যবহার করা
+    এখন আপনি useGetPostsQuery, useGetUserQuery, useAddUserMutation, ইত্যাদি হুক ব্যবহার করে API কল করতে পারবেন।
+
+    উদাহরণঃ PostList.tsx
+
+    // src/components/PostList.tsx
+
+
+
+    import React from 'react';
+    import { useGetPostsQuery } from '../redux/api/apiSlice';
+
+    const PostList = () => {
+    const { data: posts, error, isLoading } = useGetPostsQuery();
+
+    if (isLoading) return <div>Loading...</div>;
+    if (error) return <div>Error fetching posts</div>;
+
+    return (
+    <div>
+        {posts?.map((post) => (
+        <div key={post.id}>
+            <h3>{post.title}</h3>
+            <p>{post.description}</p>
+        </div>
+        ))}
+    </div>
+    );
+    };
+
+    export default PostList;
+
+
+
+
+  উদাহরণঃ AddUser.tsx
+
+    // src/components/AddUser.tsx
+
+
+
+    import React, { useState } from 'react';
+    import { useAddUserMutation } from '../redux/api/apiSlice';
+
+    const AddUser = () => {
+    const [addUser] = useAddUserMutation();
+    const [user, setUser] = useState({ name: '', email: '' });
+
+    const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await addUser(user);
+    setUser({ name: '', email: '' });
+    };
+
+    return (
+    <form onSubmit={handleSubmit}>
+        <input type="text" value={user.name} onChange={(e)=> setUser({ ...user, name: e.target.value })}
+        placeholder="Name"
+        />
+        <input type="email" value={user.email} onChange={(e)=> setUser({ ...user, email: e.target.value })}
+        placeholder="Email"
+        />
+        <button type="submit">Add User</button>
+    </form>
+    );
+    };
+
+    export default AddUser;
+
+
+
+
+    ৬. এনভায়রনমেন্ট ভ্যারিয়েবল সেটআপ করা
+    API এর baseUrl কনফিগার করার জন্য .env ফাইলে ভ্যারিয়েবল সেট করতে পারেন।
+
+    .env
+
+    NEXT_PUBLIC_API_URL=http://localhost:3000/api
+
+
+    এবং apiSlice.ts ফাইলে baseQuery এ এই ভ্যারিয়েবল ব্যবহার করুন:
+
+    // src/redux/api/apiSlice.ts
+
+    baseQuery: fetchBaseQuery({ baseUrl: process.env.NEXT_PUBLIC_API_URL }),
+
+    
+    এই ফোল্ডার স্ট্রাকচার এবং কনফিগারেশন অনুসারে, আপনার প্রজেক্ট একটি স্কেলেবল এবং মেইনটেনেবল লেভেলে থাকবে যা সহজে
+    ডেভেলপ এবং ডিবাগ করা সম্ভব হবে। RTK Query আপনাকে সহজেই ডেটা ফেচিং, কেশিং, এবং স্টেট ম্যানেজমেন্ট করতে সাহায্য করবে,
+    যা বড় অ্যাপ্লিকেশনের জন্য অনেক কার্যকর।
