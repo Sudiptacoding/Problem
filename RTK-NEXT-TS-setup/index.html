@@ -322,46 +322,62 @@ export default UserList;
 
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 
+export interface UserType {
+    id: number;
+    name: string;
+    email: string;
+    createdAt: string;
+}
+
 export const apiSlice = createApi({
     reducerPath: 'api',
     baseQuery: fetchBaseQuery({ baseUrl: 'http://localhost:3000/api' }),
-    tagTypes: ['User'], // Tags to manage cache
+    tagTypes: ['User'],
     endpoints: (builder) => ({
-        getUsers: builder.query({
+
+        // 1. Fetch all users
+        getUsers: builder.query<UserType[], void>({
             query: () => '/user',
-            providesTags: ['User'], // Cache tagging for users
+            providesTags: ['User'],
         }),
-        getUserById: builder.query({
-            query: (id) => `/user/${id}`, // Dynamic URL using the user ID
-            providesTags: (result, error, id) => [{ type: 'User', id }], // Tagging for individual user data
+
+        // 2. Fetch a user by ID
+        getUserById: builder.query<UserType, number>({
+            query: (id) => `/user/${id}`,
+            providesTags: (result, error, id) => [{ type: 'User', id }],
         }),
-        addUser: builder.mutation({
+
+        // 3. Add a new user
+        addUser: builder.mutation<UserType, Partial<UserType>>({
             query: (newUser) => ({
                 url: '/user',
                 method: 'POST',
                 body: newUser,
             }),
-            invalidatesTags: ['User'], // Invalidate User cache on add
+            invalidatesTags: ['User'],
         }),
-        updateUser: builder.mutation({
+
+        // 4. Update a user by ID
+        updateUser: builder.mutation<UserType, Partial<UserType> & { id: number }>({
             query: ({ id, ...updatedUser }) => ({
                 url: `/user/${id}`,
                 method: 'PUT',
                 body: updatedUser,
             }),
-            invalidatesTags: (result, error, { id }) => [{ type: 'User', id }], // Invalidate specific user cache
+            invalidatesTags: (result, error, { id }) => [{ type: 'User', id }],
         }),
-        deleteUser: builder.mutation({
+
+        // 5. Delete a user by ID
+        deleteUser: builder.mutation<{ success: boolean }, number>({
             query: (id) => ({
                 url: `/user/${id}`,
                 method: 'DELETE',
             }),
-            invalidatesTags: ['User'], // Invalidate User cache on delete
+            invalidatesTags: ['User'],
         }),
     }),
 });
 
-// Export hooks for usage in functional components
 export const {
     useGetUsersQuery,
     useGetUserByIdQuery,
@@ -369,3 +385,4 @@ export const {
     useUpdateUserMutation,
     useDeleteUserMutation,
 } = apiSlice;
+
