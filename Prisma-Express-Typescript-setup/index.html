@@ -16,7 +16,7 @@ cd my-prisma-app
 
 npm init -y
 npm install express
-npm install typescript ts-node @types/node @types/express --save-dev
+npm install typescript ts-node @types/node @types/express @types/cors --save-dev
 npm install @prisma/client
 npm install prisma --save-dev
 
@@ -303,19 +303,32 @@ app.listen(PORT, () => console.log(`Server is running on port ${PORT}`));
 
 
 import express from 'express';
-import userRoutes from './routes/userRoutes';
-import postRoutes from './routes/postRoutes';
-import commentRoutes from './routes/commentRoutes';
+import cors from 'cors';
+import userRoutes from './router/userRoutes';
+import postRoutes from './router/postRoutes';
 
 const app = express();
+
+// CORS পলিসি সেটআপ
+app.use(cors({
+    origin: 'http://localhost:3000', // ফ্রন্টএন্ডের URL
+    methods: ['GET', 'POST', 'PUT', 'DELETE'],
+    credentials: true, // যদি Cookies বা Authorization Headers প্রয়োজন হয়
+}));
+
 app.use(express.json());
 
-// Routes
+// User routs
 app.use('/api', userRoutes);
+// Post routs
 app.use('/api', postRoutes);
-app.use('/api', commentRoutes);
+
+app.get('/', (req, res) => {
+    res.send('Test api running');
+});
 
 export default app;
+
 
 
 
