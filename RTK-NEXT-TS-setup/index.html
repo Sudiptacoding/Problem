@@ -246,3 +246,126 @@ export type RootState = ReturnType<typeof store.getState>;
     এই ফোল্ডার স্ট্রাকচার এবং কনফিগারেশন অনুসারে, আপনার প্রজেক্ট একটি স্কেলেবল এবং মেইনটেনেবল লেভেলে থাকবে যা সহজে
     ডেভেলপ এবং ডিবাগ করা সম্ভব হবে। RTK Query আপনাকে সহজেই ডেটা ফেচিং, কেশিং, এবং স্টেট ম্যানেজমেন্ট করতে সাহায্য করবে,
     যা বড় অ্যাপ্লিকেশনের জন্য অনেক কার্যকর।
+
+
+
+    
+
+------------------ Data featch -------------------- easy ---
+১ম উদাহরণ: useGetUsersQuery, useAddUserMutation, refetch
+
+
+
+
+Ex:----------2 --- || unwrap();
+
+"use client";
+
+import { useGetUsersQuery, useAddUserMutation, useUpdateUserMutation, useDeleteUserMutation } from '@/redux/api/apiSlice';
+import React from 'react';
+
+const UserList: React.FC = () => {
+    const { data: users, isLoading, isError, error } = useGetUsersQuery();
+    const [addUser] = useAddUserMutation();
+    const [updateUser] = useUpdateUserMutation();
+    const [deleteUser] = useDeleteUserMutation();
+
+    const handleAddUser = async () => {
+        try {
+            await addUser({ name: 'New User' }).unwrap();
+        } catch (err) {
+            console.error('Failed to add user:', err);
+        }
+    };
+
+    const handleUpdateUser = async (userId: string) => {
+        try {
+            await updateUser({ id: userId, name: 'Updated User' }).unwrap();
+        } catch (err) {
+            console.error('Failed to update user:', err);
+        }
+    };
+
+    const handleDeleteUser = async (userId: string) => {
+        try {
+            await deleteUser(userId).unwrap();
+        } catch (err) {
+            console.error('Failed to delete user:', err);
+        }
+    };
+
+    if (isLoading) return <div>Loading...</div>;
+    if (isError) return <div>Error: {error?.message}</div>;
+
+    return (
+        <div>
+            <h2>Total Users: {users?.length}</h2>
+            <button onClick={handleAddUser}>Add New User</button>
+            <ul>
+                {users?.map((user) => (
+                    <li key={user.id}>
+                        {user.name}
+                        <button onClick={() => handleUpdateUser(user.id)}>Update</button>
+                        <button onClick={() => handleDeleteUser(user.id)}>Delete</button>
+                    </li>
+                ))}
+            </ul>
+        </div>
+    );
+};
+
+export default UserList;
+
+
+
+------------- Redux code --------------------
+
+import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
+
+export const apiSlice = createApi({
+    reducerPath: 'api',
+    baseQuery: fetchBaseQuery({ baseUrl: 'http://localhost:3000/api' }),
+    tagTypes: ['User'], // Tags to manage cache
+    endpoints: (builder) => ({
+        getUsers: builder.query({
+            query: () => '/user',
+            providesTags: ['User'], // Cache tagging for users
+        }),
+        getUserById: builder.query({
+            query: (id) => `/user/${id}`, // Dynamic URL using the user ID
+            providesTags: (result, error, id) => [{ type: 'User', id }], // Tagging for individual user data
+        }),
+        addUser: builder.mutation({
+            query: (newUser) => ({
+                url: '/user',
+                method: 'POST',
+                body: newUser,
+            }),
+            invalidatesTags: ['User'], // Invalidate User cache on add
+        }),
+        updateUser: builder.mutation({
+            query: ({ id, ...updatedUser }) => ({
+                url: `/user/${id}`,
+                method: 'PUT',
+                body: updatedUser,
+            }),
+            invalidatesTags: (result, error, { id }) => [{ type: 'User', id }], // Invalidate specific user cache
+        }),
+        deleteUser: builder.mutation({
+            query: (id) => ({
+                url: `/user/${id}`,
+                method: 'DELETE',
+            }),
+            invalidatesTags: ['User'], // Invalidate User cache on delete
+        }),
+    }),
+});
+
+// Export hooks for usage in functional components
+export const {
+    useGetUsersQuery,
+    useGetUserByIdQuery,
+    useAddUserMutation,
+    useUpdateUserMutation,
+    useDeleteUserMutation,
+} = apiSlice;
