@@ -5,12 +5,15 @@ my-app/
 │   ├── app/                       # Next.js 13+ App Router
 │   │   ├── api/                   # API রাউট
 │   │   ├── layout.tsx             # অ্যাপের রুট লেআউট
+│   │   └── page.tsx               # অ্যাপের প্রধান পেজ
 │   ├── components/                # পুনঃব্যবহারযোগ্য কম্পোনেন্ট
 │   ├── context/                   # গ্লোবাল কন্টেক্সট প্রোভাইডার
+│   │   └── Providers.tsx          # Redux এবং অন্যান্য প্রোভাইডার
 │   ├── hooks/                     # কাস্টম হুক্স
 │   ├── redux/                     # Redux এবং RTK Query সেটআপ
 │   │   ├── api/                   # RTK Query API ডেফিনেশন
-│   │   └── slices/                # Redux স্লাইস
+│   │   │   └── apiSlice.ts        # API স্লাইস
+│   │   └── store.ts               # Redux স্টোর সেটআপ
 │   ├── types/                     # TypeScript টাইপস
 │   └── utils/                     # ইউটিলিটি ফাংশন
 ├── .env                           # এনভায়রনমেন্ট ভ্যারিয়েবল
@@ -19,11 +22,13 @@ my-app/
 
 
 
+
+
 ১. প্রজেক্ট সেটআপ
 
 প্রথমে আপনার Next.js ও TypeScript প্রজেক্ট সেটআপ করুন এবং প্রয়োজনীয় প্যাকেজ ইন্সটল করুন।
 
-npx create-next-app@latest my-app --ts
+npx create-next-app@latest my-app --ts              -or-      npx create-next-app@14 my-app --ts 
 cd my-app
 npm install @reduxjs/toolkit react-redux
 
@@ -112,16 +117,29 @@ export type RootState = ReturnType<typeof store.getState>;
     ৪. Redux Provider সেটআপ করা
     আপনার Next.js অ্যাপে Redux প্রোভাইডার সেটআপ করুন, যাতে Redux স্টোর অ্যাপ জুড়ে অ্যাক্সেস করা যায়।
 
-    app/layout.tsx
 
+    // src/context/Providers.tsx
 
-
-    // src/app/layout.tsx
-
-
+    "use client"; // এটি যোগ করুন যাতে এটি ক্লায়েন্ট কম্পোনেন্ট হিসেবে কাজ করে
 
     import { Provider } from 'react-redux';
     import store from '../redux/store';
+
+    export default function Providers({
+    children,
+    }: {
+    children: React.ReactNode;
+    }) {
+    return <Provider store={store}>{children}</Provider>;
+    }
+
+
+
+    <!-- Main layout then setup -->
+
+    // src/app/layout.tsx
+
+    import Providers from '../context/Providers';
 
     export default function RootLayout({
     children,
@@ -129,11 +147,12 @@ export type RootState = ReturnType<typeof store.getState>;
     children: React.ReactNode;
     }) {
     return (
-    <Provider store={store}>
+    <Providers>
         {children}
-    </Provider>
+    </Providers>
     );
     }
+
 
 
 
@@ -172,7 +191,7 @@ export type RootState = ReturnType<typeof store.getState>;
 
 
 
-  উদাহরণঃ AddUser.tsx
+    উদাহরণঃ AddUser.tsx
 
     // src/components/AddUser.tsx
 
@@ -223,7 +242,7 @@ export type RootState = ReturnType<typeof store.getState>;
 
     baseQuery: fetchBaseQuery({ baseUrl: process.env.NEXT_PUBLIC_API_URL }),
 
-    
+
     এই ফোল্ডার স্ট্রাকচার এবং কনফিগারেশন অনুসারে, আপনার প্রজেক্ট একটি স্কেলেবল এবং মেইনটেনেবল লেভেলে থাকবে যা সহজে
     ডেভেলপ এবং ডিবাগ করা সম্ভব হবে। RTK Query আপনাকে সহজেই ডেটা ফেচিং, কেশিং, এবং স্টেট ম্যানেজমেন্ট করতে সাহায্য করবে,
     যা বড় অ্যাপ্লিকেশনের জন্য অনেক কার্যকর।
