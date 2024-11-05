@@ -1,0 +1,66 @@
+1 . ---------- Inviroment vereable setup ----------
+
+npm i dotenv
+
+
+2 . Add new file 
+
+src>secret.ts
+
+├── src/
+│ ├── controllers/ # প্রতিটি মডেলের জন্য আলাদা আলাদা কন্ট্রোলার ফাইল
+│ │ ├── userController.ts
+│ │ ├── postController.ts
+│ │ └── commentController.ts
+│ │
+│ ├── index.ts 
+│ └── app.ts 
+│ └── secrets.ts --------------------------- add this file
+├── .env # পরিবেশগত ভ্যারিয়েবল যেমন DATABASE_URL ইত্যাদি সংরক্ষণ
+├── package.json # প্রজেক্টের নির্ভরশীলতা এবং স্ক্রিপ্টগুলো
+├── tsconfig.json # TypeScript কনফিগারেশন ফাইল
+└── README.md # প্রজেক্ট সম্পর্কিত তথ্য ও নির্দেশনা
+
+
+3 .   Add code in secrets.ts  file
+
+src>secrets.ts 
+
+import dotenv from 'dotenv'
+dotenv.config({ path: '.env' })
+export const PORT = process.env.PORT
+
+
+4.  Add PORT in main .env file
+
+.env
+
+PORT=3000
+
+
+5.   nodemon -- setup
+
+npm install nodemon --save-dev
+
+
+"scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "nodemon src/index.ts", -----  add this code and run --- npm run dev
+    "prisma": "prisma"
+  },
+
+
+
+6 ---  node.bcrypt.js  ---- setup and code
+
+npm install bcrypt
+npm install @types/bcrypt --save-dev
+
+
+npm install jsonwebtoken
+npm install @types/jsonwebtoken --save-dev
+
+
+
+
