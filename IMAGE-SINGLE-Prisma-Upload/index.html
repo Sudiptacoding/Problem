@@ -5,20 +5,38 @@ uploads---
 
 
 
+# Prisma MODEL--
+
+model Blog {
+    id          Int      @id @default(autoincrement())
+    title       String
+    description String
+    image       String?
+    createdAt   DateTime @default(now())
+    updatedAt   DateTime @updatedAt
+  }
+
+
+
 #  Router  ----
 
 app.use('/', router);
 ------------------------------------
 
 import express from 'express';
-import upload from './upload';
-import { getAllBlogs, deleteBlog, updateBlog, createBlog, } from './createBlog';
+
+import { getAllBlogs, deleteBlog, updateBlog, createBlog, getBlogById, } from './createBlog';
+import uploadSingleImages from './upload';
 
 const router = express.Router();
 
 router.get('/blogs', getAllBlogs);
-router.post('/blogs', upload.single('image'), createBlog);
-router.put('/blogs/:id', upload.single('image'), updateBlog);
+router.get('/blogs/:id', getBlogById);
+
+router.post('/blogs', uploadSingleImages, createBlog);
+
+router.put('/blogs/:id', uploadSingleImages, updateBlog);
+
 router.delete('/blogs/:id', deleteBlog);
 
 export default router;
@@ -49,7 +67,8 @@ const storage = multer.diskStorage({
 });
 
 const upload = multer({ storage: storage });
-export default upload;
+export const uploadSingleImages = upload.single('image')
+export default uploadSingleImages;
 
 
 
@@ -119,6 +138,32 @@ export const getAllBlogs = async (req: Request, res: Response): Promise<any> => 
         });
     }
 };
+
+
+
+// Get blog by id
+export const getBlogById = async (req: Request, res: Response): Promise<any> => {
+    try {
+        const { id } = req.params;
+        const blogs = await prismaClient.blog.findUnique({
+            where: {
+                id: +id
+            }
+        });
+        return res.status(400).json({
+            message: 'Blogs retrieved successfully',
+            data: blogs,
+        });
+    } catch (error) {
+        return res.status(400).json({
+            message: 'Could not retrieve blogs',
+            error: 'data NOT_FOUND',
+        });
+    }
+};
+
+
+
 
 // Update a blog
 export const updateBlog = async (req: Request, res: Response): Promise<any> => {
