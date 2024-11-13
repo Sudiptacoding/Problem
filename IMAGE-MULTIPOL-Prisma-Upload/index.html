@@ -1,0 +1,320 @@
+# src এবং uploads ফোল্ডার একই ডিরেক্টারিতে থাকবে
+
+src---
+uploads---
+
+
+
+#  Router  ----
+
+app.use('/', router);
+------------------------------------
+
+import express from 'express';
+import uploadMultipleImages from './upload';
+import { createGallery, deleteGallery, deleteSingleImage, getAllGalleries, getGalleryById, updateGallery } from './createBlog';
+
+const router = express.Router();
+
+router.post('/galleries', uploadMultipleImages, createGallery);
+
+router.get('/galleries', getAllGalleries);
+router.get('/galleries/:id', getGalleryById);
+
+router.delete('/gallery/:id', deleteSingleImage);
+router.delete('/galleries/:id', deleteGallery);
+
+router.put('/galleries/:id', uploadMultipleImages, updateGallery);
+
+
+export default router;
+
+
+
+
+
+# Upload Middleware ----
+
+
+
+import multer from 'multer';
+import fs from 'fs';
+import path from 'path';
+
+// আপলোড ফোল্ডার তৈরি
+const dir = './uploads';
+
+if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+}
+
+// multer স্টোরেজ কনফিগারেশন
+const storage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        cb(null, dir);  // ফাইলটি `uploads` ফোল্ডারে সংরক্ষণ হবে
+    },
+    filename: (req, file, cb) => {
+        // ফাইলের নামের সাথে একটি টিমস্ট্যাম্প যুক্ত করা
+        const timestamp = Date.now();
+        const fileName = `${timestamp}-${file.originalname}`;
+        cb(null, fileName);
+    },
+});
+
+// একাধিক ফাইল আপলোড করার জন্য multer মিডলওয়্যার
+const uploadMultiple = multer({ storage: storage });
+
+// এখানে ফাইলগুলি 10টি পর্যন্ত আপলোড করার অনুমতি দেয়া হয়েছে
+export const uploadMultipleImages = uploadMultiple.array('images', 10);
+
+export default uploadMultipleImages;
+
+
+
+
+# All CRUD Function ----
+
+
+import { Request, Response } from 'express';
+import { prismaClient } from '..';
+import fs from 'fs';
+// Prisma ক্লায়েন্ট ইম্পোর্ট করুন
+
+// গ্যালারি তৈরি
+export const createGallery = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const { title } = req.body;
+        const images = req.files as Express.Multer.File[];
+
+        // যদি ফাইল না থাকে
+        if (!images || images.length === 0) {
+            res.status(400).json({
+                message: 'No images uploaded',
+            });
+            return;
+        }
+
+        // ফাইলগুলির পাথ সংগ্রহ
+        const imageUrls = images.map(file => ({
+            url: file.path,  // Use 'url' to store the file path
+        }));
+
+        // Prisma দিয়ে গ্যালারি ডাটাবেসে সেভ করা
+        const gallery = await prismaClient.gallery.create({
+            data: {
+                title,
+                images: {
+                    create: imageUrls,  // Create related Image records
+                },
+            },
+        });
+
+        res.status(201).json({
+            message: 'Gallery created successfully',
+            data: gallery,
+        });
+    } catch (error) {
+        res.status(500).json({
+            message: 'Could not create gallery',
+            error: 'error some',
+        });
+    }
+};
+
+
+
+export const getAllGalleries = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const galleries = await prismaClient.gallery.findMany({
+            include: { images: true },
+        });
+        res.status(200).json({
+            message: 'Galleries retrieved successfully',
+            data: galleries,
+        });
+    } catch (error) {
+        res.status(500).json({
+            message: 'Could not retrieve galleries',
+            error: 'some rong',
+        });
+    }
+};
+
+
+export const getGalleryById = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const { id } = req.params;
+        const gallery = await prismaClient.gallery.findUnique({
+            where: { id: Number(id) },
+            include: { images: true },
+        });
+
+        if (!gallery) {
+            res.status(404).json({ message: 'Gallery not found' });
+            return;
+        }
+
+        res.status(200).json({
+            message: 'Gallery retrieved successfully',
+            data: gallery,
+        });
+    } catch (error) {
+        res.status(500).json({
+            message: 'Could not retrieve gallery',
+            error: 'somethis rong',
+        });
+    }
+};
+
+
+// DELET SINGLE
+
+export const deleteSingleImage = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const { id } = req.params;
+
+        // Find image by ID
+        const image = await prismaClient.image.findUnique({
+            where: { id: Number(id) },
+        });
+
+        if (!image) {
+            res.status(404).json({ message: 'Image not found' });
+            return;
+        }
+
+        // Delete image from the filesystem
+        if (fs.existsSync(image.url)) {
+            fs.unlinkSync(image.url);
+        }
+
+        // Delete image from database
+        await prismaClient.image.delete({
+            where: { id: Number(id) },
+        });
+
+        res.status(200).json({ message: 'Image deleted successfully' });
+    } catch (error) {
+        res.status(500).json({
+            message: 'Could not delete image',
+            error: error instanceof Error ? error.message : 'Unknown error',
+        });
+    }
+};
+
+// DELET MENY
+
+export const deleteGallery = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const { id } = req.params;
+
+        // গ্যালারি এবং তার ইমেজ খুঁজে বের করা
+        const gallery = await prismaClient.gallery.findUnique({
+            where: { id: Number(id) },
+            include: { images: true },
+        });
+
+        if (!gallery) {
+            res.status(404).json({ message: 'Gallery not found' });
+            return;
+        }
+
+        // ফাইল সিস্টেম থেকে ইমেজ ডিলিট করা
+        gallery.images.forEach(image => {
+            if (fs.existsSync(image.url)) {
+                try {
+                    fs.unlinkSync(image.url);
+                } catch (err) {
+                    console.error(`Error deleting file ${image.url}:`, err);
+                }
+            }
+        });
+
+        // ডেটাবেস থেকে ইমেজ ডিলিট করা
+        await prismaClient.image.deleteMany({
+            where: { galleryId: Number(id) },
+        });
+
+        // গ্যালারি ডিলিট করা
+        await prismaClient.gallery.delete({
+            where: { id: Number(id) },
+        });
+
+        res.status(200).json({
+            message: 'Gallery and associated images deleted successfully',
+        });
+    } catch (error) {
+        res.status(500).json({
+            message: 'Could not delete gallery',
+            error: error instanceof Error ? error.message : 'Unknown error',
+        });
+    }
+};
+
+
+export const updateGallery = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const { id } = req.params;
+        const { title } = req.body;
+        const images = req.files as Express.Multer.File[];
+
+        // Find the existing gallery
+        const existingGallery = await prismaClient.gallery.findUnique({
+            where: { id: Number(id) },
+            include: { images: true },
+        });
+
+        if (!existingGallery) {
+            res.status(404).json({ message: 'Gallery not found' });
+            return;
+        }
+
+        // Remove old images if new ones are uploaded
+        if (images && images.length > 0) {
+            existingGallery.images.forEach(image => {
+                if (fs.existsSync(image.url)) {
+                    fs.unlinkSync(image.url);
+                }
+            });
+
+            // Collect paths of new images
+            const newImagePaths = images.map(file => ({ url: file.path }));
+
+            // Update gallery with new title and images
+            const updatedGallery = await prismaClient.gallery.update({
+                where: { id: Number(id) },
+                data: {
+                    title,
+                    images: {
+                        deleteMany: {}, // Delete existing images
+                        create: newImagePaths, // Create new images
+                    },
+                },
+            });
+
+            res.status(200).json({
+                message: 'Gallery updated successfully',
+                data: updatedGallery,
+            });
+        } else {
+            // Update title only if no new images are uploaded
+            const updatedGallery = await prismaClient.gallery.update({
+                where: { id: Number(id) },
+                data: { title },
+            });
+
+            res.status(200).json({
+                message: 'Gallery title updated successfully',
+                data: updatedGallery,
+            });
+        }
+    } catch (error) {
+        res.status(500).json({
+            message: 'Could not update gallery',
+            error: 'some error',
+        });
+    }
+};
+
+
+
