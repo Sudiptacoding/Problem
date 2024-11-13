@@ -5,6 +5,24 @@ uploads---
 
 
 
+# Prisma MODEl ----
+
+model Gallery {
+    id      Int      @id @default(autoincrement())
+    title   String
+    images  Image[]  // A one-to-many relationship between Gallery and Image
+    createdAt DateTime @default(now())
+  }
+  
+  model Image {
+    id        Int      @id @default(autoincrement())
+    url       String   // File URL (path to the file on disk or cloud storage)
+    galleryId Int      // Foreign key to the Gallery
+    gallery   Gallery @relation(fields: [galleryId], references: [id])
+  }
+
+
+
 #  Router  ----
 
 app.use('/', router);
