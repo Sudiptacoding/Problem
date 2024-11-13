@@ -1,0 +1,227 @@
+1.   Install some package --
+
+npm install bcrypt
+npm install @types/bcrypt --save-dev
+
+npm install jsonwebtoken
+npm install @types/jsonwebtoken --save-dev
+
+
+# Prisma model --
+model User {
+    id          Int          @id @default(autoincrement())
+    name        String
+    email       String       @unique
+    password    String
+    role        Role         @default(USER)    
+  }
+  
+  enum Role {
+    ADMIN
+    SUB_ADMIN
+    MENTOR
+    USER
+  }
+
+
+
+
+
+2.  Registration and Login and Me ( Controller )
+
+import { NextFunction, Request, Response } from "express";
+import { prismaClient } from "..";
+import { compareSync, hashSync } from "bcrypt";
+import * as jwt from 'jsonwebtoken';
+
+const JWT_SECRET = '12233444'
+
+export const signup = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+        const { email, password, name } = req.body;
+        let user = await prismaClient.user.findFirst({ where: { email } });
+
+        if (user) {
+            res.status(200).json({ message: "User already exists" })
+            return
+        }
+
+        user = await prismaClient.user.create({
+            data: {
+                name,
+                email,
+                password: hashSync(password, 10)
+            }
+        });
+
+        const token = jwt.sign({ userId: user.id }, JWT_SECRET);
+
+        res.cookie('token', token, {
+            httpOnly: true, // Prevents client-side JavaScript from accessing the cookie
+            secure: false,
+            maxAge: 60 * 60 * 1000, // 1 hour
+            sameSite: 'lax' // Prevents CSRF by only sending the cookie to the same site
+        });
+
+
+        res.json({ user, token }); // Optionally send user info
+    } catch (error) {
+        next(error); // Pass any unexpected errors to the middleware
+    }
+};
+
+export const login = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    console.log(req.body)
+    try {
+        const { email, password } = req.body;
+
+        let user = await prismaClient.user.findFirst({ where: { email } });
+
+        if (!user) {
+            res.status(404).json({ message: "User does not exist" })
+            return
+        }
+
+        if (!compareSync(password, user.password)) {
+            res.status(404).json({ message: "Incorrect password" })
+            return
+        }
+
+        // const token = jwt.sign({ userId: user.id }, JWT_SECRET);
+        // Change this
+        const token = jwt.sign({ userId: user.id, role: user.role }, JWT_SECRET);
+
+
+        res.cookie('token', token, {
+            httpOnly: true,
+            secure: false,
+            maxAge: 3600000
+        });
+
+        res.json({ message: 'Logged in successfully', token });
+    } catch (error) {
+        next(error); // Pass any unexpected errors to the middleware
+    }
+};
+
+// // Current user endpoint
+export const me = (req: Request, res: Response, next: NextFunction) => {
+    if (req.user) {
+        res.json(req.user); // Return the authenticated user's information
+    } else {
+        res.status(404).json({ message: "User not found" })
+        return 
+    }
+};
+
+
+
+
+3.  authMiddleWear  -- ( For Decode token to user )
+
+
+import { NextFunction, Response, Request } from "express";
+import { prismaClient } from "..";
+import * as jwt from 'jsonwebtoken';
+
+const JWT_SECRET = '12233444'
+
+*********** FOR CORS USER ********************
+
+import { User } from '@prisma/client';
+
+declare global {
+  namespace Express {
+    export interface Request {
+      user?: User;
+    }
+  }
+}
+
+// Auth Middleware for Token Verification and User Retrieval
+export const authMiddleware  = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    const token = req.headers.authorization;
+    if (!token) {
+        res.status(404).json({ message: "Unauthorized" })
+        return    
+    }
+
+    try {
+        const payload = jwt.verify(token as string, JWT_SECRET) as { userId: number };    
+        const user = await prismaClient.user.findFirst({
+            where: { id: payload.userId }
+        });
+        if (!user) {
+            res.status(404).json({ message: "Unauthorized" })
+            return
+            
+        }
+        // @ts-ignore: attaching custom user property to the request
+        req.user = user;
+        next();
+    } catch (error) {
+        res.status(404).json({ message: "Unauthorized" })
+        return        
+    }
+};
+
+
+
+
+4.   isAdmin ( token decode use is admin or not check )
+
+
+import { Request, Response, NextFunction } from 'express';
+
+export const isAdmin = (req: Request, res: Response, next: NextFunction): void => {
+    console.log(req.user)
+    const userRole = req.user?.role; // আমরা ধরে নিচ্ছি req.user তে logged in user এর তথ্য আছে
+    // যদি ব্যবহারকারী অ্যাডমিন না হয়, তাহলে 403 (Access Denied) রেসপন্স দিন
+    if (userRole !== 'ADMIN') {
+        res.status(403).json({ message: 'Access Denied! Only admins can perform this action.' });
+        return
+    }
+    // যদি অ্যাডমিন হয়, তাহলে পরবর্তী মিথডে যাওয়া হবে
+    next();
+};
+
+
+
+5.   Set permission for access ( show user model for enum ROLE -- ADMIN,USER,...... )
+
+
+import { NextFunction, Request, Response } from "express";
+
+// Role Authorization Middleware
+export const authorizeRole = (allowedRoles: string[]) => {
+    return (req: Request, res: Response, next: NextFunction): void => {
+        console.log(req.user)    
+        // @ts-ignore: checking user property on the request
+        if (!req.user || !allowedRoles.includes(req.user.role)) {
+            res.status(403).json({ message: "Access denied" });
+        } else {
+            next();
+        }
+    };
+};
+
+
+
+6.   How to set route ( Set permission for access this routs )
+
+import { Request, Response, Router } from "express";
+const router: Router = Router()
+
+router.post('/signup', signup)
+router.post('/login', login)
+
+router.get('/me', authMiddleware, me)
+
+router.get('/admin', authMiddleware, isAdmin, (req, res) => {
+    res.json({ message: "Ami admin vai " })
+})
+router.get('/user', authMiddleware, authorizeRole(["USER", "MENTOR", "SUB_ADMIN", "ADMIN"]), (req, res) => {
+    res.json({ message: "Vai sobai access this route " })
+})
+
+export default router;
