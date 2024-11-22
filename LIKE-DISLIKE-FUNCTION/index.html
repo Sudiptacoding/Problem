@@ -1,18 +1,16 @@
 <!-- Frontend code -->
 
-const [likedPosts, setLikedPosts] = useState<number[]>([]);
-
-  const toggleLike = async (postId: number) => {
-    if (likedPosts.includes(postId)) {
-      // Dislike API কল করুন
-      await axios.post('http://localhost:5000/dislike', { currentUser: 1, likeId: postId });
-      setLikedPosts(likedPosts.filter((id) => id !== postId));
-    } else {
-      // Like API কল করুন
-      await axios.post('http://localhost:5000/like', { currentUser: 1, likeId: postId });
-      setLikedPosts([...likedPosts, postId]);
-    }
-  };
+  const currentUser = 5
+  const handelLike = async (id: number) => {
+    const likeId = id
+    const res = await axios.post('http://localhost:5000/like', { currentUser, likeId })
+    console.log(res)
+  }
+  const handelDisLike = async (id: number) => {
+    const likeId = id
+    const res = await axios.post('http://localhost:5000/dislike', { currentUser, likeId })
+    console.log(res)
+  }
 
 
 
@@ -20,10 +18,15 @@ const [likedPosts, setLikedPosts] = useState<number[]>([]);
 
 {posts.map((post) => (
     <div key={post.id}>
-      <h3>{post.title}</h3>
-      <button onClick={() => toggleLike(post.id)}>
-        {likedPosts.includes(post.id) ? "Dislike" : "Like"}
-      </button>
+       <p>{item?.user?.length}</p>
+                {
+                  // চেক করুন ব্যবহারকারী লাইক করেছেন কিনা
+                  item?.user?.some((i: any) => i.id === currentUser) ? (
+                    <button onClick={() => handelDisLike(item?.id)} className="btn bg-blue-600">Dislike</button>
+                  ) : (
+                    <button onClick={() => handelLike(item?.id)} className="btn bg-blue-600">Like</button>
+                  )
+                }
     </div>
   ))}
   
