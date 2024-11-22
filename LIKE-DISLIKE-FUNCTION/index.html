@@ -1,0 +1,84 @@
+<!-- Frontend code -->
+
+const [likedPosts, setLikedPosts] = useState<number[]>([]);
+
+  const toggleLike = async (postId: number) => {
+    if (likedPosts.includes(postId)) {
+      // Dislike API কল করুন
+      await axios.post('http://localhost:5000/dislike', { currentUser: 1, likeId: postId });
+      setLikedPosts(likedPosts.filter((id) => id !== postId));
+    } else {
+      // Like API কল করুন
+      await axios.post('http://localhost:5000/like', { currentUser: 1, likeId: postId });
+      setLikedPosts([...likedPosts, postId]);
+    }
+  };
+
+
+
+<!-- Map Data -->
+
+{posts.map((post) => (
+    <div key={post.id}>
+      <h3>{post.title}</h3>
+      <button onClick={() => toggleLike(post.id)}>
+        {likedPosts.includes(post.id) ? "Dislike" : "Like"}
+      </button>
+    </div>
+  ))}
+  
+
+
+
+  <!-- Prisma Model -->
+
+  model User {
+    id       Int       @id @default(autoincrement())
+    name     String
+    profiles Profile[] @relation("UserProfile")
+    post     Post[]    @relation("UserPost")
+  }
+  
+  model Post {
+    id          Int    @id @default(autoincrement())
+    title       String
+    description String
+    image       String
+    user        User[] @relation("UserPost")
+  }
+
+
+
+
+
+<!-- Backend Many to Many Relation -->
+
+app.post('/like', async (req, res) => {
+    const { currentUser, likeId } = req.body
+    const data = await prisma.post.update({
+        where: { id: +likeId },
+        data: {
+            user: {
+                connect: {
+                    id: +currentUser
+                }
+            }
+        }
+    })
+    res.json(data)
+})
+
+app.post('/dislike', async (req, res) => {
+    const { currentUser, likeId } = req.body
+    const data = await prisma.post.update({
+        where: { id: +likeId },
+        data: {
+            user: {
+                disconnect: {
+                    id: +currentUser
+                }
+            }
+        }
+    })
+    res.json(data)
+})
