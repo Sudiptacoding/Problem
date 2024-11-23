@@ -1,0 +1,162 @@
+src/
+│
+├── app/
+│   ├── page.tsx               # Main page for your app
+│   └── layout.tsx             # Layout component that wraps the pages
+│
+├── components/
+│   ├── Counter.tsx            # Counter component (or other UI components)
+│   └── OtherComponent.tsx     # Other UI components
+│
+├── redux/
+│   ├── store.ts              # Redux store configuration (with RTK Query API slices)
+│   └── slices/
+│       ├── counterSlice.ts    # Counter slice (local state)
+│       └── apiSlice.ts        # RTK Query API slice
+│
+├── provider/
+│   └── reduxProvider.tsx     # Redux provider wrapper component
+│
+├── lib/
+│   └── hooks.ts              # Custom hooks for using Redux (useAppDispatch, useAppSelector, etc.)
+│
+└── styles/
+    ├── globals.css           # Global styles
+    └── otherStyles.css       # Any other style files
+
+
+
+<!-- Installation npm -->
+npm install @reduxjs/toolkit react-redux
+
+
+<!-- Step 1 -->  ( src/redux/slices/apiSlice.ts )
+
+// src/redux/slices/apiSlice.ts
+
+import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
+
+// Define your API slice using createApi
+export const apiSlice = createApi({
+  reducerPath: 'api',  // Unique name for the API slice in the Redux store
+  baseQuery: fetchBaseQuery({ baseUrl: 'https://api.example.com/' }),  // Replace with your API base URL
+  endpoints: (builder) => ({
+    // Define a query to fetch posts
+    getPosts: builder.query({
+      query: () => 'posts',  // The endpoint to fetch data from
+    }),
+    // Example of a mutation to create a post
+    createPost: builder.mutation({
+      query: (newPost) => ({
+        url: 'posts',
+        method: 'POST',
+        body: newPost,
+      }),
+    }),
+  }),
+});
+
+export const { useGetPostsQuery, useCreatePostMutation } = apiSlice; // Export hooks for use in components
+
+
+<!-- Step 2 --> ( src/redux/store.ts )
+
+// src/redux/store.ts
+
+import { configureStore } from '@reduxjs/toolkit';
+import counterSlice from './slices/counterSlice'; // Counter slice
+import { apiSlice } from './slices/apiSlice';    // Import the RTK Query API slice
+
+const store = configureStore({
+  reducer: {
+    counter: counterSlice,  // Local state slice
+    [apiSlice.reducerPath]: apiSlice.reducer,  // RTK Query slice
+  },
+  middleware: (getDefaultMiddleware) =>
+    getDefaultMiddleware().concat(apiSlice.middleware),  // Add the RTK Query middleware
+});
+
+export type RootState = ReturnType<typeof store.getState>;
+export type AppDispatch = typeof store.dispatch;
+
+export default store;
+
+
+
+<!-- Step 3 -->  ( src/provider/reduxProvider.tsx )
+
+// src/provider/reduxProvider.tsx
+
+'use client';
+
+import { Provider } from 'react-redux';
+import store from '@/redux/store';
+
+const ReduxProvider = ({ children }: { children: React.ReactNode }) => {
+  return <Provider store={store}>{children}</Provider>;
+};
+
+export default ReduxProvider;
+
+
+
+<!-- Step 4 -->  ( src/components/Counter.tsx )
+
+'use client';
+
+import { useAppDispatch, useAppSelector } from '@/lib/hooks';
+import { increment, decrement } from '@/redux/slices/counterSlice';
+import { useGetPostsQuery, useCreatePostMutation } from '@/redux/slices/apiSlice'; // Import RTK Query hooks
+
+const Counter = () => {
+  const count = useAppSelector((state) => state.counter.value);
+  const dispatch = useAppDispatch();
+
+  // Using RTK Query hook to fetch posts
+  const { data: posts, isLoading, isError } = useGetPostsQuery();
+
+  // Using RTK Query hook to create a post
+  const [createPost] = useCreatePostMutation();
+
+  if (isLoading) return <div>Loading...</div>;
+  if (isError) return <div>Error occurred while fetching posts.</div>;
+
+  return (
+    <div>
+      <h1>Counter: {count}</h1>
+      <button onClick={() => dispatch(increment())}>Increment</button>
+      <button onClick={() => dispatch(decrement())}>Decrement</button>
+
+      <h2>Posts</h2>
+      <ul>
+        {posts && posts.map((post: { id: number; title: string }) => (
+          <li key={post.id}>{post.title}</li>
+        ))}
+      </ul>
+
+      <button
+        onClick={() =>
+          createPost({ title: 'New Post', body: 'This is a new post' })
+        }
+      >
+        Create Post
+      </button>
+    </div>
+  );
+};
+
+export default Counter;
+
+
+
+<!-- Step 5 -->  ( src/lib/hooks.ts )
+ 
+// src/lib/hooks.ts
+
+import { useDispatch, useSelector, useStore } from 'react-redux';
+import type { AppDispatch, RootState } from '@/redux/store';
+
+// Use these hooks throughout the app for proper typing
+export const useAppDispatch = () => useDispatch<AppDispatch>();
+export const useAppSelector = <T>(selector: (state: RootState) => T) => useSelector(selector);
+export const useAppStore = () => useStore<AppDispatch>();
