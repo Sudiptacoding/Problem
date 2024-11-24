@@ -1,0 +1,446 @@
+src/
+│
+├── app/
+│   ├── login/
+│   │   └── page.tsx
+│   ├── registration/
+│   │   └── page.tsx
+│   └── page.tsx
+│
+├── lib/
+│   └── hooks.ts
+│   └── useSyncUser.ts
+│
+├── provider/
+│   └── reduxProvider.tsx
+│
+├── redux/
+│   ├── store.ts
+│   ├── slices/
+│   │   ├── authApi.ts
+│   │   └── userSlice.ts
+│
+└── public/
+    └── (static assets like images, etc.)
+
+
+<!-- Step 1 --> ( src/app/login/page.tsx )
+
+"use client"
+import { useLoginUserMutation } from "@/redux/slices/authApi";
+import {  setUser } from "@/redux/slices/userSlice";
+import { useRouter } from "next/navigation";
+
+import { useForm, SubmitHandler } from "react-hook-form"
+import { useDispatch } from 'react-redux';
+
+interface IFormInput {
+    email: string
+    password: string
+}
+
+const Login = () => {
+    const router = useRouter();
+    const dispatch = useDispatch();
+    const [loginUser] = useLoginUserMutation()
+    const { register, handleSubmit } = useForm<IFormInput>()
+    const onSubmit: SubmitHandler<IFormInput> = async (data) => {
+        const res = await loginUser(data)
+        console.log(res)
+        if (res) {
+            dispatch(setUser(res?.data?.user));
+            router.push('/')
+        }
+    }
+    return (
+        <div>
+            <form onSubmit={handleSubmit(onSubmit)}>
+                <input {...register("email")} />
+                <input {...register("password")} />
+                <input type="submit" />
+            </form>
+        </div>
+    );
+};
+
+export default Login;
+
+
+<!-- Step 2 --> ( src/app/registration/page.tsx )
+
+"use client"
+import { useRegistrationUserMutation } from "@/redux/slices/authApi";
+import { setUser } from "@/redux/slices/userSlice";
+import { useRouter } from "next/navigation";
+import { useForm, SubmitHandler } from "react-hook-form"
+import { useDispatch } from 'react-redux';
+
+interface IFormInput {
+    name: string
+    email: string
+    password: string
+}
+const Registration = () => {
+    const router = useRouter();
+    const dispatch = useDispatch();
+    const [registrationUser] = useRegistrationUserMutation()
+    const { register, handleSubmit } = useForm<IFormInput>()
+    const onSubmit: SubmitHandler<IFormInput> = async (data) => {
+        const res = await registrationUser(data)
+        if (res) {
+            dispatch(setUser(res?.data?.user));
+            router.push('/')
+        }
+    }
+    return (
+        <div>
+            <form onSubmit={handleSubmit(onSubmit)}>
+                <input {...register("name")} />
+                <input {...register("email")} />
+                <input {...register("password")} />
+                <input type="submit" />
+            </form>
+        </div>
+    );
+};
+
+export default Registration;
+
+
+<!-- Step 3 --> ( src/app/page.tsx )
+
+"use client"
+import { useAppDispatch, useAppSelector } from '@/lib/hooks';
+import { useLogOutUserMutation } from '@/redux/slices/authApi';
+import { clearUser } from '@/redux/slices/userSlice';
+import Link from 'next/link';
+import React from 'react';
+const Home = () => {
+  const user = useAppSelector((state) => state?.user?.user);
+  const dispatch = useAppDispatch();
+  const [logOutUser] = useLogOutUserMutation();
+  const logout = async () => {
+    const res = await logOutUser(null);
+    if (res) {
+      dispatch(clearUser());
+    }
+  };
+  return (
+    <div>
+      <div>
+        {
+          user ? <div> Welcome to {user?.name}</div> : <div><Link href='/login'>Login</Link></div>
+        }
+        <button onClick={() => logout()}>LOGOUT</button>
+      </div>
+      Hi i am Home page
+    </div>
+  );
+};
+export default Home;
+
+
+<!-- Step 4 --> ( src/lib/hooks.ts )
+
+import { useDispatch, useSelector, useStore } from 'react-redux';
+import type { AppDispatch, RootState } from '@/redux/store';
+
+// Use these hooks throughout the app for proper typing
+export const useAppDispatch = () => useDispatch<AppDispatch>();
+export const useAppSelector = <T>(selector: (state: RootState) => T) => useSelector(selector);
+export const useAppStore = () => useStore<AppDispatch>();
+
+
+<!-- Step 5 --> ( src/lib/useSyncUser.ts )
+
+"use client";
+import { useCurrentUserQuery } from '@/redux/slices/authApi';
+import { clearUser, setUser } from '@/redux/slices/userSlice';
+import { useEffect } from 'react';
+import { useDispatch } from 'react-redux';
+const useSyncUser = () => {
+    const dispatch = useDispatch();
+    const { data, error } = useCurrentUserQuery(undefined);
+    useEffect(() => {
+        if (data) {
+            dispatch(setUser(data)); // ইউজার সেট করা
+        }
+        if (error) {
+            dispatch(clearUser()); // লগআউট করা
+        }
+    }, [data, error, dispatch]);
+};
+export default useSyncUser;
+
+
+<!-- Step 6 --> ( src/provider/reduxProvider.tsx )
+
+'use client';
+import { Provider } from 'react-redux';
+import store from '@/redux/store';
+import useSyncUser from '@/lib/useSyncUser';
+
+const SyncUserComponent = () => {
+  useSyncUser(); 
+  return null; 
+};
+
+const ReduxProvider = ({ children }: { children: React.ReactNode }) => {
+  return <Provider store={store}>
+    <SyncUserComponent />
+    {children}
+  </Provider>;
+};
+export default ReduxProvider;
+
+
+<!-- Step 7 --> ( src/app/layout.tsx ) 
+
+<html lang="en">
+      <ReduxProvider>
+        <body>{children}</body>
+      </ReduxProvider>
+</html>
+
+
+<!-- Step 8 --> ( src/redux/store.ts )
+
+import { configureStore } from '@reduxjs/toolkit';
+import userReducer from './slices/userSlice';
+import { authApi } from './slices/authApi';
+
+const store = configureStore({
+  reducer: {
+    user: userReducer,
+    [authApi.reducerPath]: authApi.reducer,
+  },
+  middleware: (getDefaultMiddleware) =>
+    getDefaultMiddleware().concat(authApi.middleware),  // Add the RTK Query middleware
+});
+
+export type RootState = ReturnType<typeof store.getState>;
+export type AppDispatch = typeof store.dispatch;
+export default store;
+
+<!-- Step 9 --> ( src/redux/slices/authApi.ts )
+
+import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
+export const authApi = createApi({
+    reducerPath: 'authApi',
+    baseQuery: fetchBaseQuery({
+        baseUrl: 'http://localhost:5000/api',
+        credentials: 'include', // কুকি অন্তর্ভুক্ত করা
+    }),
+    endpoints: (builder) => ({
+
+        loginUser: builder.mutation({
+            query: (user) => ({
+                url: '/login',
+                method: 'POST',
+                body: user,
+            }),
+        }),
+
+        registrationUser: builder.mutation({
+            query: (user) => ({
+                url: '/signup',
+                method: 'POST',
+                body: user,
+            }),
+        }),
+
+        currentUser: builder.query({
+            query: () => '/me',
+        }),
+
+        logOutUser: builder.mutation({
+            query: () => ({
+                url: '/logout',
+                method: 'POST',
+            }),
+        }),
+
+    }),
+});
+
+export const {
+    useLoginUserMutation,
+    useRegistrationUserMutation,
+    useCurrentUserQuery,
+    useLogOutUserMutation,
+} = authApi;
+
+
+<!-- Step 10 --> ( src/redux/slices/userSlice.ts  )
+
+import { createSlice, PayloadAction } from '@reduxjs/toolkit';
+interface UserState {
+    user: null | { id: number; name: string; email: string };
+    loading: boolean;
+    error: null | string;
+}
+const initialState: UserState = {
+    user: null,
+    loading: false,
+    error: null,
+};
+const userSlice = createSlice({
+    name: 'user',
+    initialState,
+    reducers: {
+        setUser(state, action: PayloadAction<{ id: number; name: string; email: string }>) {
+            state.user = action.payload;
+            state.error = null;
+        },
+        clearUser(state) {
+            state.user = null;
+            state.error = null;
+        },
+        setLoading(state, action: PayloadAction<boolean>) {
+            state.loading = action.payload;
+        },
+        setError(state, action: PayloadAction<string>) {
+            state.error = action.payload;
+        },
+    },
+});
+
+export const { setUser, clearUser, setLoading, setError } = userSlice.actions;
+export default userSlice.reducer;
+
+
+<!-- Set Backend for all function -->  ( ALL Routes )
+
+router.post('/signup', signup)
+router.post('/login', login)
+router.post('/logout', logout)
+router.get('/me', authMiddleware, me)
+
+
+<!-- authMiddleware --> ( Auth Middleware )
+
+import { NextFunction, Response, Request } from "express";
+import * as jwt from 'jsonwebtoken';
+const JWT_SECRET = '12233444'
+import { User } from '@prisma/client';
+import { prisma } from "..";
+
+declare global {
+  namespace Express {
+    export interface Request {
+      user?: User;
+    }
+  }
+}
+
+export const authMiddleware = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  const cookies = req.headers.cookie; 
+  const token = cookies?.split('; ').find(cookie => cookie.startsWith('token='))?.split('=')[1];
+  if (!token) {
+    res.status(404).json({ message: "Unauthorized" })
+    return
+  }
+  try {
+    const payload = jwt.verify(token as string, JWT_SECRET) as { userId: number };
+    const user = await prisma.user.findFirst({
+      where: { id: payload.userId }
+    });
+    if (!user) {
+      res.status(404).json({ message: "Unauthorized" })
+      return
+    }    
+    req.user = user;
+    next();
+  } catch (error) {
+    res.status(404).json({ message: "Unauthorized" })
+    return
+  }
+};
+
+
+<!-- Auth controllers --> ( All Controllers function )
+ 
+
+import { NextFunction, Request, Response } from "express";
+import { compareSync, hashSync } from "bcrypt";
+import * as jwt from 'jsonwebtoken';
+import { prisma } from "..";
+const JWT_SECRET = '12233444'
+export const signup = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+        const { email, password, name } = req.body;
+        let user = await prisma.user.findFirst({ where: { email } });
+        if (user) {
+            res.status(200).json({ message: "User already exists" })
+            return
+        }
+        user = await prisma.user.create({
+            data: {
+                name,
+                email,
+                password: hashSync(password, 10)
+            }
+        });
+        const token = jwt.sign({ userId: user.id }, JWT_SECRET);
+        res.cookie('token', token, {
+            httpOnly: true, // Prevents client-side JavaScript from accessing the cookie
+            secure: false,
+            maxAge: 60 * 60 * 1000, // 1 hour
+            sameSite: 'lax' // Prevents CSRF by only sending the cookie to the same site
+        });
+        res.json({ user, token }); // Optionally send user info
+    } catch (error) {
+        next(error); // Pass any unexpected errors to the middleware
+    }
+};
+
+
+export const login = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+        const { email, password } = req.body;
+        let user = await prisma.user.findFirst({ where: { email } });
+        if (!user) {
+            res.status(404).json({ message: "User does not exist" })
+            return
+        }
+        if (!compareSync(password, user.password)) {
+            res.status(404).json({ message: "Incorrect password" })
+            return
+        }
+        // const token = jwt.sign({ userId: user.id }, JWT_SECRET);
+        // Change this
+        const token = jwt.sign({ userId: user.id, role: user.role }, JWT_SECRET);
+        res.cookie('token', token, {
+            httpOnly: true,
+            secure: false,
+            maxAge: 3600000
+        });
+
+        res.json({ user, token });
+    } catch (error) {
+        next(error);
+    }
+};
+
+
+export const logout = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    res.clearCookie('token', {
+        httpOnly: true, // কুকি ব্রাউজার থেকে অ্যাক্সেসযোগ্য নয়
+        secure: process.env.NODE_ENV === 'production', // প্রোডাকশনে সিকিওর কুকি
+        sameSite: 'strict',
+    });
+    res.status(200).json({ message: 'Logged out successfully' });
+    return
+};
+
+
+// // Current user endpoint
+export const me = (req: Request, res: Response, next: NextFunction) => {
+    if (req.user) {
+        res.json(req.user); // Return the authenticated user's information
+    } else {
+        res.status(404).json({ message: "User not found" })
+        return
+    }
+};
+
